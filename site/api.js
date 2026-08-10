@@ -101,6 +101,35 @@ async function saveItemToReadwise(item) {
   return data;
 }
 
+// ── archive (every past scan, grouped by date) ────────────────
+
+async function listArchiveDates() {
+  // Just the date column across all items - cheap even after months of
+  // history - grouped client-side into counts per day. Excludes the most
+  // recent scan_date, which is "Today" and lives on index.html instead.
+  const { data, error } = await sb.from("items").select("scan_date");
+  if (error) throw error;
+
+  const counts = {};
+  for (const row of data) counts[row.scan_date] = (counts[row.scan_date] || 0) + 1;
+
+  const dates = Object.entries(counts)
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  return dates.slice(1); // drop today
+}
+
+async function getItemsForDate(date) {
+  const { data, error } = await sb
+    .from("items")
+    .select("*, sources(name, url, relevance_score), categories(name)")
+    .eq("scan_date", date)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 // ── suggested sources ────────────────────────────────────────
 
 async function listSuggested() {

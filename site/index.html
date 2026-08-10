@@ -13,6 +13,7 @@
   <a href="sources.html">Sources</a>
   <a href="suggested.html">Suggested</a>
   <a href="categories.html">Categories</a>
+  <a href="archive.html">Archive</a>
   <span class="spacer"></span>
   <button onclick="signOut()">Sign out</button>
 </nav>
@@ -29,7 +30,7 @@
 <script>
   function itemCard(item) {
     const savedClass = item.saved_to_readwise ? "saved" : "";
-    const savedLabel = item.saved_to_readwise ? "Saved" : "Save";
+    const savedLabel = item.saved_to_readwise ? "Saved to Reader" : "Save to Reader";
     return `
       <div class="card" data-item-id="${item.id}">
         <div class="item-title"><a href="${item.url}" target="_blank" rel="noopener">${item.title}</a></div>
@@ -96,11 +97,11 @@
         btn.textContent = "Saving...";
         try {
           await saveItemToReadwise(item);
-          btn.textContent = "Saved";
+          btn.textContent = "Saved to Reader";
           btn.classList.add("saved");
         } catch (err) {
           btn.disabled = false;
-          btn.textContent = "Save";
+          btn.textContent = "Save to Reader";
           alert("Couldn't save to Readwise: " + err.message);
         }
       });

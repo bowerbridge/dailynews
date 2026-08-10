@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archive — Daily Brief</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .archive-layout { display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 640px) { .archive-layout { grid-template-columns: 1fr; } }
+  .month-group { margin-bottom: 20px; }
+  .month-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  .day-link { display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); text-decoration: none; }
+  .day-link:hover, .day-link.active { background: var(--accent-soft); color: var(--accent); }
+  .day-link .count { color: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <span class="brand">Daily Brief</span>
+  <a href="index.html">Today</a>
+  <a href="sources.html">Sources</a>
+  <a href="suggested.html">Suggested</a>
+  <a href="categories.html">Categories</a>
+  <a href="archive.html" class="active">Archive</a>
+  <span class="spacer"></span>
+  <button onclick="signOut()">Sign out</button>
+</nav>
+
+<main>
+  <h1>Archive</h1>
+  <p class="page-subtitle">Every past digest, grouped by month. Today's digest lives on the <a href="index.html">Today</a> page until the next scan replaces it here.</p>
+
+  <div class="archive-layout">
+    <div id="dateList">Loading...</div>
+    <div id="content"><div class="empty-state">Pick a day to view its digest.</div></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+  function itemCard(item) {
+    const savedClass = item.saved_to_readwise ? "saved" : "";
+    const savedLabel = item.saved_to_readwise ? "Saved to Reader" : "Save to Reader";
+    return `
+      <div class="card" data-item-id="${item.id}">
+        <div class="item-title"><a href="${item.url}" target="_blank" rel="noopener">${item.title}</a></div>
+        <div class="item-summary">${item.summary || ""}</div>
+        <div class="item-meta">${item.sources?.name || "Unknown source"} · ${item.categories?.name || "Uncategorized"}</div>
+        <div class="item-actions">
+          <div class="rank-buttons" data-item-id="${item.id}" data-source-id="${item.source_id}">
+            ${[1,2,3,4,5].map(n => `<button data-score="${n}">${n}</button>`).join("")}
+          </div>
+          <button class="save-btn ${savedClass}" ${item.saved_to_readwise ? "disabled" : ""} data-item-id="${item.id}">${savedLabel}</button>
+        </div>
+      </div>`;
+  }
+
+  function monthLabel(dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+  }
+
+  function dayLabel(dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+
+  async function loadDay(date, linkEl) {
+    document.querySelectorAll(".day-link").forEach(a => a.classList.remove("active"));
+    if (linkEl) linkEl.classList.add("active");
+
+    const content = document.getElementById("content");
+    content.innerHTML = "Loading...";
+
+    const items = await getItemsForDate(date);
+    if (!items.length) {
+      content.innerHTML = `<div class="empty-state">No items for this day.</div>`;
+      return;
+    }
+
+    const grouped = {};
+    for (const item of items) {
+      const catName = item.categories?.name || "Uncategorized";
+      (grouped[catName] = grouped[catName] || []).push(item);
+    }
+
+    content.innerHTML = `<h1 style="font-size:16px;margin-bottom:16px;">${dayLabel(date)}</h1>` +
+      Object.entries(grouped).map(([cat, catItems]) => `
+        <div class="category-header">${cat}</div>
+        ${catItems.map(itemCard).join("")}
+      `).join("");
+
+    content.querySelectorAll(".rank-buttons").forEach(group => {
+      group.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button[data-score]");
+        if (!btn) return;
+        const score = Number(btn.dataset.score);
+        group.querySelectorAll("button").forEach(b => b.classList.remove("picked"));
+        btn.classList.add("picked");
+        try {
+          await rankItem(group.dataset.itemId, group.dataset.sourceId, score);
+        } catch (err) {
+          alert("Couldn't save ranking: " + err.message);
+        }
+      });
+    });
+
+    content.querySelectorAll(".save-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const itemId = btn.dataset.itemId;
+        const item = items.find(i => i.id === itemId);
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+        try {
+          await saveItemToReadwise(item);
+          btn.textContent = "Saved to Reader";
+          btn.classList.add("saved");
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "Save to Reader";
+          alert("Couldn't save to Readwise: " + err.message);
+        }
+      });
+    });
+  }
+
+  async function render() {
+    const dates = await listArchiveDates();
+    const dateList = document.getElementById("dateList");
+
+    if (!dates.length) {
+      dateList.innerHTML = `<div class="empty-state">Nothing archived yet — check back after tomorrow's scan.</div>`;
+      return;
+    }
+
+    const byMonth = {};
+    for (const { date, count } of dates) {
+      const key = date.slice(0, 7); // YYYY-MM
+      (byMonth[key] = byMonth[key] || []).push({ date, count });
+    }
+
+    dateList.innerHTML = Object.entries(byMonth).map(([monthKey, days]) => `
+      <div class="month-group">
+        <div class="month-label">${monthLabel(days[0].date)}</div>
+        ${days.map(d => `<a class="day-link" data-date="${d.date}" href="#">${dayLabel(d.date)}<span class="count">${d.count}</span></a>`).join("")}
+      </div>
+    `).join("");
+
+    dateList.querySelectorAll(".day-link").forEach(a => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        loadDay(a.dataset.date, a);
+      });
+    });
+
+    // Auto-load the most recent archived day.
+    const first = dateList.querySelector(".day-link");
+    if (first) loadDay(first.dataset.date, first);
+  }
+
+  (async () => {
+    const user = await requireAuth();
+    if (user) render();
+  })();
+</script>
+</body>
+</html>
