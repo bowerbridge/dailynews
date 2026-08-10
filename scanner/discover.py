@@ -12,7 +12,7 @@ automatically.
 import urllib.parse
 from urllib.parse import urlparse
 
-import feedparser
+from sources import fetch_feed
 
 COMMON_FEED_PATHS = ["/feed", "/rss", "/rss.xml", "/feed.xml", "/feeds/posts/default"]
 MAX_CANDIDATES_PER_CATEGORY = 5
@@ -33,7 +33,7 @@ def _try_resolve_feed(homepage_url):
     ]
     for candidate in candidates:
         try:
-            feed = feedparser.parse(candidate)
+            feed = fetch_feed(candidate)
             if feed.entries:
                 return candidate
         except Exception:
@@ -55,7 +55,7 @@ def discover_for_category(category, known_urls):
     seen_domains = set()
 
     try:
-        feed = feedparser.parse(search_url)
+        feed = fetch_feed(search_url)
     except Exception as e:
         print(f"    Error searching: {e}")
         return suggestions

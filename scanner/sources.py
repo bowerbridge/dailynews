@@ -9,9 +9,22 @@ import re
 from datetime import datetime, timezone, timedelta
 
 import feedparser
+import requests
 from dateutil import parser as dateutil_parser
 
 LOOKBACK_HOURS = 30  # a little over 24h to tolerate scan-time drift
+REQUEST_TIMEOUT = 10  # seconds
+USER_AGENT = "Mozilla/5.0 (compatible; DailyBriefBot/1.0)"
+
+
+def fetch_feed(url):
+    """Fetch and parse a feed with a hard timeout. feedparser.parse(url) has
+    no timeout of its own when given a URL directly, which can hang a scan
+    indefinitely on a slow/unresponsive domain - so fetch the bytes
+    ourselves first and hand those to feedparser instead."""
+    resp = requests.get(url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT})
+    resp.raise_for_status()
+    return feedparser.parse(resp.content)
 
 
 def clean_html(text):
@@ -36,7 +49,7 @@ def fetch_source_entries(source):
     entries = []
 
     try:
-        feed = feedparser.parse(source["feed_url"])
+        feed = fetch_feed(source["feed_url"])
     except Exception as e:
         print(f"  Error fetching {source['name']}: {e}")
         return entries
