@@ -29,10 +29,11 @@ def sydney_now():
 def should_run_now():
     """The GitHub Actions cron fires at both possible UTC offsets for 7am
     Sydney (to survive AEST/AEDT changes) - only actually run at the one
-    that's currently 7am local time. Bypassed by workflow_dispatch."""
+    that's currently 7am local time. Bypassed by workflow_dispatch.
+    Window is 7-9am to absorb GitHub Actions scheduling delays."""
     if os.environ.get("FORCE_RUN") == "true":
         return True
-    return sydney_now().hour == 7
+    return 7 <= sydney_now().hour <= 9
 
 
 def categorize_and_summarize(entries, categories):
