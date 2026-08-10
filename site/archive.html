@@ -50,6 +50,7 @@
         <div class="item-summary">${item.summary || ""}</div>
         <div class="item-meta">${item.sources?.name || "Unknown source"} · ${item.categories?.name || "Uncategorized"}</div>
         <div class="item-actions">
+          <span class="rank-label">Rank for relevance</span>
           <div class="rank-buttons" data-item-id="${item.id}" data-source-id="${item.source_id}">
             ${[1,2,3,4,5].map(n => `<button data-score="${n}">${n}</button>`).join("")}
           </div>

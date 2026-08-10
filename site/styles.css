@@ -116,7 +116,8 @@ h1 { font-size: 20px; margin: 0 0 4px; }
   gap: 8px;
 }
 
-.rank-buttons { display: flex; gap: 4px; }
+.rank-label { font-size: 11px; color: var(--muted); margin-right: 2px; }
+.rank-buttons { display: flex; align-items: center; gap: 4px; }
 .rank-buttons button {
   width: 28px; height: 28px;
   border: 1px solid var(--border);
