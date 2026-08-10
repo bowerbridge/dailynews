@@ -76,7 +76,8 @@ Items:
         messages=[{"role": "user", "content": prompt}],
     )
 
-    raw = response.content[0].text.strip()
+    text_block = next(b for b in response.content if b.type == "text")
+    raw = text_block.text.strip()
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
     results = json.loads(raw)
