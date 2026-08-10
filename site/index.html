@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Brief</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="topnav">
+  <span class="brand">Daily Brief</span>
+  <a href="index.html" class="active">Today</a>
+  <a href="sources.html">Sources</a>
+  <a href="suggested.html">Suggested</a>
+  <a href="categories.html">Categories</a>
+  <span class="spacer"></span>
+  <button onclick="signOut()">Sign out</button>
+</nav>
+
+<main>
+  <h1 id="pageTitle">Today's Digest</h1>
+  <p class="page-subtitle" id="pageSubtitle">Loading...</p>
+  <div id="content"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+  function itemCard(item) {
+    const savedClass = item.saved_to_readwise ? "saved" : "";
+    const savedLabel = item.saved_to_readwise ? "Saved" : "Save";
+    return `
+      <div class="card" data-item-id="${item.id}">
+        <div class="item-title"><a href="${item.url}" target="_blank" rel="noopener">${item.title}</a></div>
+        <div class="item-summary">${item.summary || ""}</div>
+        <div class="item-meta">${item.sources?.name || "Unknown source"}</div>
+        <div class="item-actions">
+          <div class="rank-buttons" data-item-id="${item.id}" data-source-id="${item.source_id}">
+            ${[1,2,3,4,5].map(n => `<button data-score="${n}">${n}</button>`).join("")}
+          </div>
+          <button class="save-btn ${savedClass}" ${item.saved_to_readwise ? "disabled" : ""} data-item-id="${item.id}">${savedLabel}</button>
+        </div>
+      </div>`;
+  }
+
+  async function render() {
+    const items = await getTodayItems();
+    const subtitle = document.getElementById("pageSubtitle");
+    const content = document.getElementById("content");
+
+    if (!items.length) {
+      subtitle.textContent = "No scan yet.";
+      content.innerHTML = `<div class="empty-state">Nothing here yet — the daily scan runs at 7am Sydney time.<br>You can also trigger it manually from the GitHub Actions tab.</div>`;
+      return;
+    }
+
+    subtitle.textContent = `${items.length} item${items.length !== 1 ? "s" : ""} · ${items[0].scan_date}`;
+
+    const grouped = {};
+    for (const item of items) {
+      const catName = item.categories?.name || "Uncategorized";
+      (grouped[catName] = grouped[catName] || []).push(item);
+    }
+
+    content.innerHTML = Object.entries(grouped)
+      .map(([cat, catItems]) => `
+        <div class="category-header">${cat}</div>
+        ${catItems.map(itemCard).join("")}
+      `).join("");
+
+    // Rank buttons
+    content.querySelectorAll(".rank-buttons").forEach(group => {
+      group.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button[data-score]");
+        if (!btn) return;
+        const score = Number(btn.dataset.score);
+        const itemId = group.dataset.itemId;
+        const sourceId = group.dataset.sourceId;
+        group.querySelectorAll("button").forEach(b => b.classList.remove("picked"));
+        btn.classList.add("picked");
+        try {
+          await rankItem(itemId, sourceId, score);
+        } catch (err) {
+          alert("Couldn't save ranking: " + err.message);
+        }
+      });
+    });
+
+    // Save buttons
+    content.querySelectorAll(".save-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const itemId = btn.dataset.itemId;
+        const item = items.find(i => i.id === itemId);
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+        try {
+          await saveItemToReadwise(item);
+          btn.textContent = "Saved";
+          btn.classList.add("saved");
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "Save";
+          alert("Couldn't save to Readwise: " + err.message);
+        }
+      });
+    });
+  }
+
+  (async () => {
+    const user = await requireAuth();
+    if (user) render();
+  })();
+</script>
+</body>
+</html>

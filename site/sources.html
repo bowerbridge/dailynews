@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sources — Daily Brief</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="topnav">
+  <span class="brand">Daily Brief</span>
+  <a href="index.html">Today</a>
+  <a href="sources.html" class="active">Sources</a>
+  <a href="suggested.html">Suggested</a>
+  <a href="categories.html">Categories</a>
+  <span class="spacer"></span>
+  <button onclick="signOut()">Sign out</button>
+</nav>
+
+<main>
+  <h1>Sources</h1>
+  <p class="page-subtitle">Websites, Substacks, and podcasts the daily scan reads. The score shows how relevant your rankings say each one is — it updates automatically as you rank items.</p>
+
+  <form class="inline-form" id="addForm">
+    <input id="name" placeholder="Name (e.g. Stratechery)" required>
+    <input id="url" placeholder="Homepage URL" required>
+    <input id="feedUrl" placeholder="RSS/Atom feed URL" required>
+    <select id="type">
+      <option value="website">Website</option>
+      <option value="substack">Substack</option>
+      <option value="podcast">Podcast</option>
+      <option value="other">Other</option>
+    </select>
+    <select id="categoryId"></select>
+    <button type="submit">Add source</button>
+  </form>
+
+  <div id="content"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+  let categories = [];
+
+  function scoreBadge(source) {
+    const pct = Math.round(source.relevance_score * 100);
+    const low = source.ranking_count >= 5 && source.relevance_score < 0.3;
+    return `<span class="score-badge ${low ? "low" : ""}">${pct}%${low ? " · consider removing" : ""}</span>`;
+  }
+
+  function sourceRow(source) {
+    return `
+      <div class="card source-row" data-id="${source.id}">
+        <div class="info">
+          <div class="source-name">${source.name}</div>
+          <div class="source-meta">${source.type} · <a href="${source.url}" target="_blank" rel="noopener">${source.url}</a> · ${source.ranking_count} ranking${source.ranking_count !== 1 ? "s" : ""}</div>
+        </div>
+        ${scoreBadge(source)}
+        <button class="text-btn" data-action="toggle" data-active="${source.active}">${source.active ? "Pause" : "Resume"}</button>
+        <button class="text-btn danger" data-action="delete">Remove</button>
+      </div>`;
+  }
+
+  async function render() {
+    const [sources, cats] = await Promise.all([listSources(), listCategories()]);
+    categories = cats;
+
+    document.getElementById("categoryId").innerHTML =
+      `<option value="">No category</option>` +
+      categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+
+    const content = document.getElementById("content");
+    content.innerHTML = sources.length
+      ? sources.map(sourceRow).join("")
+      : `<div class="empty-state">No sources yet — add one above.</div>`;
+
+    content.querySelectorAll("[data-action='toggle']").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.closest(".source-row").dataset.id;
+        const currentlyActive = btn.dataset.active === "true";
+        await setSourceActive(id, !currentlyActive);
+        render();
+      });
+    });
+    content.querySelectorAll("[data-action='delete']").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Remove this source? Past items stay in your history.")) return;
+        const id = btn.closest(".source-row").dataset.id;
+        await deleteSource(id);
+        render();
+      });
+    });
+  }
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await addSource({
+      name: document.getElementById("name").value.trim(),
+      url: document.getElementById("url").value.trim(),
+      feed_url: document.getElementById("feedUrl").value.trim(),
+      type: document.getElementById("type").value,
+      category_id: document.getElementById("categoryId").value || null,
+    });
+    e.target.reset();
+    render();
+  });
+
+  (async () => {
+    const user = await requireAuth();
+    if (user) render();
+  })();
+</script>
+</body>
+</html>

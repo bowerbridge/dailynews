@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suggested Sources — Daily Brief</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="topnav">
+  <span class="brand">Daily Brief</span>
+  <a href="index.html">Today</a>
+  <a href="sources.html">Sources</a>
+  <a href="suggested.html" class="active">Suggested</a>
+  <a href="categories.html">Categories</a>
+  <span class="spacer"></span>
+  <button onclick="signOut()">Sign out</button>
+</nav>
+
+<main>
+  <h1>Suggested Sources</h1>
+  <p class="page-subtitle">Found by the daily scan while searching your categories. Add the ones worth following, dismiss the rest.</p>
+  <div id="content">Loading...</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+  function suggestionRow(s) {
+    return `
+      <div class="card suggestion-row" data-id="${s.id}">
+        <div class="info">
+          <div class="source-name">${s.name}</div>
+          <div class="source-meta">${s.categories?.name || "Uncategorized"} · <a href="${s.url}" target="_blank" rel="noopener">${s.url}</a></div>
+        </div>
+        <button class="text-btn" data-action="add">Add</button>
+        <button class="text-btn danger" data-action="dismiss">Dismiss</button>
+      </div>`;
+  }
+
+  async function render() {
+    const suggestions = await listSuggested();
+    const content = document.getElementById("content");
+    content.innerHTML = suggestions.length
+      ? suggestions.map(suggestionRow).join("")
+      : `<div class="empty-state">No pending suggestions right now — check back after tomorrow's scan.</div>`;
+
+    content.querySelectorAll("[data-action='add']").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.closest(".suggestion-row").dataset.id;
+        const suggestion = suggestions.find(s => s.id === id);
+        await acceptSuggestion(suggestion);
+        render();
+      });
+    });
+    content.querySelectorAll("[data-action='dismiss']").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.closest(".suggestion-row").dataset.id;
+        await dismissSuggestion(id);
+        render();
+      });
+    });
+  }
+
+  (async () => {
+    const user = await requireAuth();
+    if (user) render();
+  })();
+</script>
+</body>
+</html>

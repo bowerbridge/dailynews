@@ -1,0 +1,46 @@
+name: Daily Brief Scan
+
+on:
+  schedule:
+    # Fires at both possible UTC times for 7am Sydney, since GitHub Actions
+    # cron can't follow DST. main.py checks the real Australia/Sydney clock
+    # and no-ops at whichever tick isn't actually 7am local time.
+    - cron: '0 20 * * *'   # 7am AEDT (UTC+11, daylight saving)
+    - cron: '0 21 * * *'   # 7am AEST (UTC+10, standard time)
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Run now regardless of current Sydney time'
+        type: boolean
+        default: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scanner/requirements.txt
+
+      - name: Run scan
+        working-directory: scanner
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DAILY_BRIEF_USER_ID: ${{ secrets.DAILY_BRIEF_USER_ID }}
+          READWISE_TOKEN: ${{ secrets.READWISE_TOKEN }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          FORCE_RUN: ${{ github.event.inputs.force_run }}
+        run: python main.py

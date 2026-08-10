@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Brief — Sign in</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main>
+  <div class="card login-card">
+    <h1>Daily Brief</h1>
+    <p class="page-subtitle">Sign in to view your digest.</p>
+    <input id="email" type="email" placeholder="Email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="signInBtn">Sign in</button>
+    <div class="error-text" id="errorText"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+  const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.DAILY_BRIEF_CONFIG;
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Already signed in? Skip straight to the digest.
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session) window.location.href = "index.html";
+  });
+
+  async function signIn() {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const errorText = document.getElementById("errorText");
+    errorText.textContent = "";
+
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      errorText.textContent = error.message;
+      return;
+    }
+    window.location.href = "index.html";
+  }
+
+  document.getElementById("signInBtn").addEventListener("click", signIn);
+  document.getElementById("password").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") signIn();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Categories — Daily Brief</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="topnav">
+  <span class="brand">Daily Brief</span>
+  <a href="index.html">Today</a>
+  <a href="sources.html">Sources</a>
+  <a href="suggested.html">Suggested</a>
+  <a href="categories.html" class="active">Categories</a>
+  <span class="spacer"></span>
+  <button onclick="signOut()">Sign out</button>
+</nav>
+
+<main>
+  <h1>Categories</h1>
+  <p class="page-subtitle">Your interest areas. Keywords are used both to judge item relevance and to search for new sources to suggest — write them like a natural search query.</p>
+
+  <form class="inline-form" id="addForm">
+    <input id="name" placeholder="Category name (e.g. AI & Society)" required>
+    <input id="keywords" placeholder="Keywords (e.g. artificial intelligence society ethics)" required>
+    <button type="submit">Add category</button>
+  </form>
+
+  <div id="content">Loading...</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+  function categoryRow(c) {
+    return `
+      <div class="card source-row" data-id="${c.id}">
+        <div class="info">
+          <div class="source-name">${c.name}</div>
+          <div class="source-meta">${c.keywords}</div>
+        </div>
+        <button class="text-btn danger" data-action="delete">Remove</button>
+      </div>`;
+  }
+
+  async function render() {
+    const cats = await listCategories();
+    const content = document.getElementById("content");
+    content.innerHTML = cats.length
+      ? cats.map(categoryRow).join("")
+      : `<div class="empty-state">No categories yet — add one above.</div>`;
+
+    content.querySelectorAll("[data-action='delete']").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Remove this category? Sources linked to it keep scanning but lose the tag.")) return;
+        const id = btn.closest(".source-row").dataset.id;
+        await deleteCategory(id);
+        render();
+      });
+    });
+  }
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await addCategory(
+      document.getElementById("name").value.trim(),
+      document.getElementById("keywords").value.trim()
+    );
+    e.target.reset();
+    render();
+  });
+
+  (async () => {
+    const user = await requireAuth();
+    if (user) render();
+  })();
+</script>
+</body>
+</html>
