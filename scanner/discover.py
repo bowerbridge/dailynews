@@ -97,7 +97,14 @@ def discover_for_category(category, known_urls):
 
 
 def discover_all(categories, known_urls):
+    # Deduplicate by URL across all categories — the same domain can appear in
+    # multiple category searches, and a batch upsert with duplicate URLs in the
+    # same request causes a Postgres "cannot affect row a second time" error.
     all_suggestions = []
+    seen_urls = set()
     for category in categories:
-        all_suggestions.extend(discover_for_category(category, known_urls))
+        for suggestion in discover_for_category(category, known_urls):
+            if suggestion["url"] not in seen_urls:
+                seen_urls.add(suggestion["url"])
+                all_suggestions.append(suggestion)
     return all_suggestions
