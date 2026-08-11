@@ -31,6 +31,11 @@ async function addCategory(name, keywords) {
   if (error) throw error;
 }
 
+async function updateCategory(id, name, keywords) {
+  const { error } = await sb.from("categories").update({ name, keywords }).eq("id", id);
+  if (error) throw error;
+}
+
 async function deleteCategory(id) {
   const { error } = await sb.from("categories").delete().eq("id", id);
   if (error) throw error;
