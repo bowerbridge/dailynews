@@ -23,7 +23,7 @@
   <p class="page-subtitle">Your interest areas. Keywords are used both to judge item relevance and to search for new sources to suggest — write them like a natural search query.</p>
 
   <form class="inline-form" id="addForm">
-    <input id="name" placeholder="Category name (e.g. AI & Society)" required>
+    <input id="name" placeholder="Category name (e.g. AI &amp; Society)" required>
     <input id="keywords" placeholder="Keywords (e.g. artificial intelligence society ethics)" required>
     <button type="submit">Add category</button>
   </form>
@@ -35,42 +35,108 @@
 <script src="config.js"></script>
 <script src="api.js"></script>
 <script>
-  function categoryRow(c) {
+  function esc(str) {
+    return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+
+  function viewHTML(name, keywords) {
     return `
-      <div class="card source-row" data-id="${c.id}">
-        <div class="info">
-          <div class="source-name">${c.name}</div>
-          <div class="source-meta">${c.keywords}</div>
-        </div>
-        <button class="text-btn danger" data-action="delete">Remove</button>
-      </div>`;
+      <div class="info">
+        <div class="source-name">${esc(name)}</div>
+        <div class="source-meta">${esc(keywords)}</div>
+      </div>
+      <button class="text-btn" data-action="edit">Edit</button>
+      <button class="text-btn danger" data-action="delete">Remove</button>`;
+  }
+
+  function editHTML(name, keywords) {
+    return `
+      <div class="info" style="display:flex;flex-direction:column;gap:8px;flex:1;">
+        <input class="edit-name" value="${esc(name)}" placeholder="Category name"
+          style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;font-weight:600;">
+        <input class="edit-keywords" value="${esc(keywords)}" placeholder="Keywords"
+          style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;">
+      </div>
+      <button class="text-btn" data-action="save" style="color:var(--success);font-weight:600;">Save</button>
+      <button class="text-btn" data-action="cancel">Cancel</button>`;
+  }
+
+  function bindCard(card) {
+    const id = card.dataset.id;
+
+    card.querySelector("[data-action='edit']")?.addEventListener("click", () => {
+      card.innerHTML = editHTML(card.dataset.name, card.dataset.keywords);
+      bindCard(card);
+      card.querySelector(".edit-name").focus();
+    });
+
+    card.querySelector("[data-action='cancel']")?.addEventListener("click", () => {
+      card.innerHTML = viewHTML(card.dataset.name, card.dataset.keywords);
+      bindCard(card);
+    });
+
+    card.querySelector("[data-action='save']")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const name = card.querySelector(".edit-name").value.trim();
+      const keywords = card.querySelector(".edit-keywords").value.trim();
+      if (!name) { card.querySelector(".edit-name").focus(); return; }
+      btn.textContent = "Saving…";
+      btn.disabled = true;
+      try {
+        await updateCategory(id, name, keywords);
+        card.dataset.name = name;
+        card.dataset.keywords = keywords;
+        card.innerHTML = viewHTML(name, keywords);
+        bindCard(card);
+      } catch (err) {
+        btn.textContent = "Save";
+        btn.disabled = false;
+        alert("Save failed: " + err.message);
+      }
+    });
+
+    card.querySelector("[data-action='delete']")?.addEventListener("click", async () => {
+      const name = card.dataset.name;
+      if (!confirm(`Remove "${name}"? Sources linked to it keep scanning but lose the tag.`)) return;
+      await deleteCategory(id);
+      card.remove();
+      if (!document.querySelector(".source-row")) {
+        document.getElementById("content").innerHTML =
+          `<div class="empty-state">No categories yet — add one above.</div>`;
+      }
+    });
   }
 
   async function render() {
     const cats = await listCategories();
     const content = document.getElementById("content");
-    content.innerHTML = cats.length
-      ? cats.map(categoryRow).join("")
-      : `<div class="empty-state">No categories yet — add one above.</div>`;
-
-    content.querySelectorAll("[data-action='delete']").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (!confirm("Remove this category? Sources linked to it keep scanning but lose the tag.")) return;
-        const id = btn.closest(".source-row").dataset.id;
-        await deleteCategory(id);
-        render();
-      });
-    });
+    if (!cats.length) {
+      content.innerHTML = `<div class="empty-state">No categories yet — add one above.</div>`;
+      return;
+    }
+    content.innerHTML = cats.map(c => `
+      <div class="card source-row" data-id="${c.id}" data-name="${esc(c.name)}" data-keywords="${esc(c.keywords)}">
+        ${viewHTML(c.name, c.keywords)}
+      </div>`).join("");
+    content.querySelectorAll(".source-row").forEach(bindCard);
   }
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await addCategory(
-      document.getElementById("name").value.trim(),
-      document.getElementById("keywords").value.trim()
-    );
-    e.target.reset();
-    render();
+    const btn = e.target.querySelector("button");
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await addCategory(
+        document.getElementById("name").value.trim(),
+        document.getElementById("keywords").value.trim()
+      );
+      e.target.reset();
+      render();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add category";
+    }
   });
 
   (async () => {
