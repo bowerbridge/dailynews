@@ -119,6 +119,11 @@ def main():
               "the workflow fires at two UTC times to cover both AEST and AEDT).")
         sys.exit(0)
 
+    scan_date = sydney_now().date().isoformat()
+    if db.has_scanned_today(scan_date):
+        print(f"Already scanned today ({scan_date}) - skipping duplicate cron run.")
+        sys.exit(0)
+
     categories = db.get_categories()
     sources = db.get_active_sources()
     sources_by_id = {s["id"]: s for s in sources}
@@ -144,7 +149,6 @@ def main():
     maybe_auto_save(items, sources_by_id)
 
     print("\nSaving items to database...")
-    scan_date = sydney_now().date().isoformat()
     db_rows = [
         {
             "source_id": item["source_id"],
