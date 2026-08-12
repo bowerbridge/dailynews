@@ -24,8 +24,8 @@
 
   <form class="inline-form" id="addForm">
     <input id="name" placeholder="Name (e.g. Stratechery)" required>
-    <input id="url" placeholder="Homepage URL" required>
-    <input id="feedUrl" placeholder="RSS/Atom feed URL" required>
+    <input id="url" placeholder="Homepage URL (optional if RSS provided)">
+    <input id="feedUrl" placeholder="RSS/Atom feed URL (optional if URL provided)">
     <select id="type">
       <option value="website">Website</option>
       <option value="substack">Substack</option>
@@ -97,15 +97,29 @@
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await addSource({
-      name: document.getElementById("name").value.trim(),
-      url: document.getElementById("url").value.trim(),
-      feed_url: document.getElementById("feedUrl").value.trim(),
-      type: document.getElementById("type").value,
-      category_id: document.getElementById("categoryId").value || null,
-    });
-    e.target.reset();
-    render();
+    const url = document.getElementById("url").value.trim();
+    const feedUrl = document.getElementById("feedUrl").value.trim();
+    if (!url && !feedUrl) {
+      alert("Please enter at least a Homepage URL or an RSS feed URL.");
+      return;
+    }
+    const btn = e.target.querySelector("button[type='submit']");
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await addSource({
+        name: document.getElementById("name").value.trim(),
+        url: url || feedUrl,
+        feed_url: feedUrl || url,
+        type: document.getElementById("type").value,
+        category_id: document.getElementById("categoryId").value || null,
+      });
+      e.target.reset();
+      render();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add source";
+    }
   });
 
   (async () => {
