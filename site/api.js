@@ -58,6 +58,11 @@ async function addSource({ name, url, feed_url, type, category_id, use_google_ne
   return data;
 }
 
+async function updateSource(id, { name, url, feed_url, type, use_google_news }) {
+  const { error } = await sb.from("sources").update({ name, url, feed_url, type, use_google_news }).eq("id", id);
+  if (error) throw error;
+}
+
 async function setSourceActive(id, active) {
   const { error } = await sb.from("sources").update({ active }).eq("id", id);
   if (error) throw error;
