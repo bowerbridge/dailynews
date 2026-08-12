@@ -1,12 +1,9 @@
-"""Fetch recent entries from RSS/Atom feeds.
-
-Covers websites, Substack publications, and podcasts — all three publish a
-standard RSS/Atom feed, so a single feedparser-based fetch works for all of
-them. `source["type"]` is carried through for display purposes only.
-"""
+"""Fetch recent entries from RSS/Atom feeds, or via Google News search for
+sources that don't publish their own feed (use_google_news=true)."""
 
 import re
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse, quote
 
 import feedparser
 import requests
@@ -25,6 +22,14 @@ def fetch_feed(url):
     resp = requests.get(url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT})
     resp.raise_for_status()
     return feedparser.parse(resp.content)
+
+
+def _google_news_url(homepage_url):
+    """Construct a Google News RSS search URL that returns recent articles
+    from a given domain. Used for sources without their own RSS feed."""
+    netloc = urlparse(homepage_url).netloc
+    domain = netloc[4:] if netloc.startswith("www.") else netloc
+    return f"https://news.google.com/rss/search?q={quote('site:' + domain)}&hl=en&gl=US&ceid=US:en"
 
 
 def clean_html(text):
@@ -48,8 +53,13 @@ def fetch_source_entries(source):
     cutoff = datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
     entries = []
 
+    if source.get("use_google_news"):
+        feed_url = _google_news_url(source["url"])
+    else:
+        feed_url = source["feed_url"]
+
     try:
-        feed = fetch_feed(source["feed_url"])
+        feed = fetch_feed(feed_url)
     except Exception as e:
         print(f"  Error fetching {source['name']}: {e}")
         return entries
@@ -84,7 +94,8 @@ def fetch_all(sources):
     """sources: list of active source rows from Supabase."""
     all_entries = []
     for source in sources:
-        print(f"  Fetching {source['name']} ({source.get('type', 'website')})...")
+        via = " (via Google News)" if source.get("use_google_news") else ""
+        print(f"  Fetching {source['name']}{via}...")
         entries = fetch_source_entries(source)
         print(f"    {len(entries)} recent entries found")
         all_entries.extend(entries)
