@@ -24,8 +24,14 @@
 
   <form class="inline-form" id="addForm">
     <input id="name" placeholder="Name (e.g. Stratechery)" required>
-    <input id="url" placeholder="Homepage URL (optional if RSS provided)">
-    <input id="feedUrl" placeholder="RSS/Atom feed URL (optional if URL provided)">
+    <input id="url" placeholder="Homepage URL" required>
+    <div id="feedUrlRow" style="display:contents;">
+      <input id="feedUrl" placeholder="RSS/Atom feed URL">
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer;">
+      <input type="checkbox" id="useGoogleNews" style="margin:0;">
+      No RSS — use Google News
+    </label>
     <select id="type">
       <option value="website">Website</option>
       <option value="substack">Substack</option>
@@ -45,10 +51,31 @@
 <script>
   let categories = [];
 
+  // Toggle RSS field visibility when "No RSS" is checked
+  document.getElementById("useGoogleNews").addEventListener("change", function () {
+    const feedUrlRow = document.getElementById("feedUrlRow");
+    const feedInput = document.getElementById("feedUrl");
+    if (this.checked) {
+      feedInput.value = "";
+      feedInput.disabled = true;
+      feedInput.style.opacity = "0.4";
+    } else {
+      feedInput.disabled = false;
+      feedInput.style.opacity = "";
+    }
+  });
+
   function scoreBadge(source) {
     const pct = Math.round(source.relevance_score * 100);
     const low = source.ranking_count >= 5 && source.relevance_score < 0.3;
     return `<span class="score-badge ${low ? "low" : ""}">${pct}%${low ? " · consider removing" : ""}</span>`;
+  }
+
+  function feedBadge(source) {
+    if (source.use_google_news) {
+      return `<span class="score-badge" title="Fetched via Google News search — no RSS feed">via Google News</span>`;
+    }
+    return "";
   }
 
   function sourceRow(source) {
@@ -58,6 +85,7 @@
           <div class="source-name">${source.name}</div>
           <div class="source-meta">${source.type} · <a href="${source.url}" target="_blank" rel="noopener">${source.url}</a> · ${source.ranking_count} ranking${source.ranking_count !== 1 ? "s" : ""}</div>
         </div>
+        ${feedBadge(source)}
         ${scoreBadge(source)}
         <button class="text-btn" data-action="toggle" data-active="${source.active}">${source.active ? "Pause" : "Resume"}</button>
         <button class="text-btn danger" data-action="delete">Remove</button>
@@ -97,24 +125,30 @@
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const useGoogleNews = document.getElementById("useGoogleNews").checked;
     const url = document.getElementById("url").value.trim();
     const feedUrl = document.getElementById("feedUrl").value.trim();
-    if (!url && !feedUrl) {
-      alert("Please enter at least a Homepage URL or an RSS feed URL.");
+
+    if (!useGoogleNews && !feedUrl) {
+      alert("Please enter an RSS/Atom feed URL, or check "No RSS — use Google News".");
       return;
     }
+
     const btn = e.target.querySelector("button[type='submit']");
     btn.disabled = true;
     btn.textContent = "Adding…";
     try {
       await addSource({
         name: document.getElementById("name").value.trim(),
-        url: url || feedUrl,
+        url,
         feed_url: feedUrl || url,
         type: document.getElementById("type").value,
         category_id: document.getElementById("categoryId").value || null,
+        use_google_news: useGoogleNews,
       });
       e.target.reset();
+      document.getElementById("feedUrl").disabled = false;
+      document.getElementById("feedUrl").style.opacity = "";
       render();
     } finally {
       btn.disabled = false;
