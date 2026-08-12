@@ -25,9 +25,7 @@
   <form class="inline-form" id="addForm">
     <input id="name" placeholder="Name (e.g. Stratechery)" required>
     <input id="url" placeholder="Homepage URL" required>
-    <div id="feedUrlRow" style="display:contents;">
-      <input id="feedUrl" placeholder="RSS/Atom feed URL">
-    </div>
+    <input id="feedUrl" placeholder="RSS/Atom feed URL">
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer;">
       <input type="checkbox" id="useGoogleNews" style="margin:0;">
       No RSS — use Google News
@@ -51,18 +49,18 @@
 <script>
   let categories = [];
 
-  // Toggle RSS field visibility when "No RSS" is checked
+  const INPUT_STYLE = "padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;width:100%;box-sizing:border-box;";
+
+  function esc(str) {
+    return String(str || "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  }
+
+  // Toggle RSS field in the Add form
   document.getElementById("useGoogleNews").addEventListener("change", function () {
-    const feedUrlRow = document.getElementById("feedUrlRow");
     const feedInput = document.getElementById("feedUrl");
-    if (this.checked) {
-      feedInput.value = "";
-      feedInput.disabled = true;
-      feedInput.style.opacity = "0.4";
-    } else {
-      feedInput.disabled = false;
-      feedInput.style.opacity = "";
-    }
+    feedInput.value = "";
+    feedInput.disabled = this.checked;
+    feedInput.style.opacity = this.checked ? "0.4" : "";
   });
 
   function scoreBadge(source) {
@@ -71,24 +69,150 @@
     return `<span class="score-badge ${low ? "low" : ""}">${pct}%${low ? " · consider removing" : ""}</span>`;
   }
 
-  function feedBadge(source) {
-    if (source.use_google_news) {
-      return `<span class="score-badge" title="Fetched via Google News search — no RSS feed">via Google News</span>`;
-    }
-    return "";
+  function feedBadge(useGoogleNews) {
+    return useGoogleNews
+      ? `<span class="score-badge" title="Fetched via Google News search — no RSS feed">via Google News</span>`
+      : "";
+  }
+
+  function viewHTML(source) {
+    return `
+      <div class="info">
+        <div class="source-name">${esc(source.name)}</div>
+        <div class="source-meta">${source.type} · <a href="${source.url}" target="_blank" rel="noopener">${esc(source.url)}</a> · ${source.ranking_count} ranking${source.ranking_count !== 1 ? "s" : ""}</div>
+      </div>
+      ${feedBadge(source.use_google_news)}
+      ${scoreBadge(source)}
+      <button class="text-btn" data-action="edit">Edit</button>
+      <button class="text-btn" data-action="toggle" data-active="${source.active}">${source.active ? "Pause" : "Resume"}</button>
+      <button class="text-btn danger" data-action="delete">Remove</button>`;
+  }
+
+  function editHTML(card) {
+    const useGN = card.dataset.useGoogleNews === "true";
+    const typeOptions = ["website","substack","podcast","other"]
+      .map(t => `<option value="${t}"${card.dataset.type === t ? " selected" : ""}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`)
+      .join("");
+    return `
+      <div class="info" style="display:flex;flex-direction:column;gap:8px;flex:1;">
+        <input class="edit-name" value="${esc(card.dataset.name)}" placeholder="Name" style="${INPUT_STYLE}font-weight:600;">
+        <input class="edit-url" value="${esc(card.dataset.url)}" placeholder="Homepage URL" style="${INPUT_STYLE}">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input class="edit-feed-url" value="${esc(card.dataset.feedUrl)}" placeholder="RSS/Atom feed URL"
+            ${useGN ? 'disabled style="' + INPUT_STYLE + 'flex:1;opacity:0.4;"' : 'style="' + INPUT_STYLE + 'flex:1;"'}>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer;">
+            <input type="checkbox" class="edit-use-google-news" ${useGN ? "checked" : ""} style="margin:0;">
+            No RSS
+          </label>
+        </div>
+        <select class="edit-type" style="${INPUT_STYLE}">${typeOptions}</select>
+      </div>
+      <button class="text-btn" data-action="save" style="color:var(--success);font-weight:600;">Save</button>
+      <button class="text-btn" data-action="cancel">Cancel</button>`;
+  }
+
+  function datasetToSource(card) {
+    return {
+      id: card.dataset.id,
+      name: card.dataset.name,
+      url: card.dataset.url,
+      feed_url: card.dataset.feedUrl,
+      type: card.dataset.type,
+      use_google_news: card.dataset.useGoogleNews === "true",
+      relevance_score: parseFloat(card.dataset.relevanceScore),
+      ranking_count: parseInt(card.dataset.rankingCount),
+      active: card.dataset.active === "true",
+    };
+  }
+
+  function bindCard(card) {
+    const id = card.dataset.id;
+
+    card.querySelector("[data-action='edit']")?.addEventListener("click", () => {
+      card.innerHTML = editHTML(card);
+      bindCard(card);
+      card.querySelector(".edit-name").focus();
+      // Wire No RSS toggle in edit mode
+      card.querySelector(".edit-use-google-news").addEventListener("change", function () {
+        const fi = card.querySelector(".edit-feed-url");
+        fi.disabled = this.checked;
+        fi.style.opacity = this.checked ? "0.4" : "";
+        if (this.checked) fi.value = "";
+      });
+    });
+
+    card.querySelector("[data-action='cancel']")?.addEventListener("click", () => {
+      card.innerHTML = viewHTML(datasetToSource(card));
+      bindCard(card);
+    });
+
+    card.querySelector("[data-action='save']")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const name = card.querySelector(".edit-name").value.trim();
+      const url = card.querySelector(".edit-url").value.trim();
+      const feedUrl = card.querySelector(".edit-feed-url").value.trim();
+      const useGN = card.querySelector(".edit-use-google-news").checked;
+      const type = card.querySelector(".edit-type").value;
+
+      if (!name) { card.querySelector(".edit-name").focus(); return; }
+      if (!url)  { card.querySelector(".edit-url").focus();  return; }
+      if (!useGN && !feedUrl) {
+        alert('Please enter an RSS feed URL or check "No RSS".');
+        return;
+      }
+
+      btn.textContent = "Saving…";
+      btn.disabled = true;
+      try {
+        await updateSource(id, { name, url, feed_url: feedUrl || url, type, use_google_news: useGN });
+        card.dataset.name = name;
+        card.dataset.url = url;
+        card.dataset.feedUrl = feedUrl || url;
+        card.dataset.type = type;
+        card.dataset.useGoogleNews = String(useGN);
+        card.innerHTML = viewHTML(datasetToSource(card));
+        bindCard(card);
+      } catch (err) {
+        btn.textContent = "Save";
+        btn.disabled = false;
+        alert("Save failed: " + err.message);
+      }
+    });
+
+    card.querySelector("[data-action='toggle']")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const currentlyActive = btn.dataset.active === "true";
+      await setSourceActive(id, !currentlyActive);
+      card.dataset.active = String(!currentlyActive);
+      btn.dataset.active = String(!currentlyActive);
+      btn.textContent = currentlyActive ? "Resume" : "Pause";
+    });
+
+    card.querySelector("[data-action='delete']")?.addEventListener("click", async () => {
+      const name = card.dataset.name;
+      if (!confirm(`Remove "${name}"? Past items stay in your history.`)) return;
+      await deleteSource(id);
+      card.remove();
+      if (!document.querySelector(".source-row")) {
+        document.getElementById("content").innerHTML =
+          '<div class="empty-state">No sources yet — add one above.</div>';
+      }
+    });
   }
 
   function sourceRow(source) {
     return `
-      <div class="card source-row" data-id="${source.id}">
-        <div class="info">
-          <div class="source-name">${source.name}</div>
-          <div class="source-meta">${source.type} · <a href="${source.url}" target="_blank" rel="noopener">${source.url}</a> · ${source.ranking_count} ranking${source.ranking_count !== 1 ? "s" : ""}</div>
-        </div>
-        ${feedBadge(source)}
-        ${scoreBadge(source)}
-        <button class="text-btn" data-action="toggle" data-active="${source.active}">${source.active ? "Pause" : "Resume"}</button>
-        <button class="text-btn danger" data-action="delete">Remove</button>
+      <div class="card source-row"
+        data-id="${source.id}"
+        data-name="${esc(source.name)}"
+        data-url="${esc(source.url)}"
+        data-feed-url="${esc(source.feed_url)}"
+        data-type="${source.type}"
+        data-use-google-news="${source.use_google_news}"
+        data-relevance-score="${source.relevance_score}"
+        data-ranking-count="${source.ranking_count}"
+        data-active="${source.active}">
+        ${viewHTML(source)}
       </div>`;
   }
 
@@ -105,22 +229,7 @@
       ? sources.map(sourceRow).join("")
       : `<div class="empty-state">No sources yet — add one above.</div>`;
 
-    content.querySelectorAll("[data-action='toggle']").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.closest(".source-row").dataset.id;
-        const currentlyActive = btn.dataset.active === "true";
-        await setSourceActive(id, !currentlyActive);
-        render();
-      });
-    });
-    content.querySelectorAll("[data-action='delete']").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (!confirm("Remove this source? Past items stay in your history.")) return;
-        const id = btn.closest(".source-row").dataset.id;
-        await deleteSource(id);
-        render();
-      });
-    });
+    content.querySelectorAll(".source-row").forEach(bindCard);
   }
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
@@ -128,12 +237,10 @@
     const useGoogleNews = document.getElementById("useGoogleNews").checked;
     const url = document.getElementById("url").value.trim();
     const feedUrl = document.getElementById("feedUrl").value.trim();
-
     if (!useGoogleNews && !feedUrl) {
-      alert('Please enter an RSS/Atom feed URL, or check "No RSS — use Google News".');
+      alert('Please enter an RSS/Atom feed URL or check "No RSS — use Google News".');
       return;
     }
-
     const btn = e.target.querySelector("button[type='submit']");
     btn.disabled = true;
     btn.textContent = "Adding…";
