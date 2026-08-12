@@ -49,8 +49,8 @@ async function listSources() {
   return data;
 }
 
-async function addSource({ name, url, feed_url, type, category_id }) {
-  const { data, error } = await sb.from("sources").insert({ name, url, feed_url, type }).select().single();
+async function addSource({ name, url, feed_url, type, category_id, use_google_news }) {
+  const { data, error } = await sb.from("sources").insert({ name, url, feed_url, type, use_google_news }).select().single();
   if (error) throw error;
   if (category_id) {
     await sb.from("source_categories").insert({ source_id: data.id, category_id });
@@ -154,6 +154,7 @@ async function acceptSuggestion(suggestion) {
     feed_url: suggestion.feed_url || suggestion.url,
     type: "website",
     category_id: suggestion.category_id,
+    use_google_news: false,
   });
   const { error } = await sb.from("suggested_sources").update({ status: "added" }).eq("id", suggestion.id);
   if (error) throw error;
