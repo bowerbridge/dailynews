@@ -93,6 +93,12 @@ def insert_items(items):
     return _post("items", items, upsert_on="user_id,url,scan_date")
 
 
+def has_scanned_today(scan_date):
+    """Return True if a scan already completed for this scan_date."""
+    rows = _get("items", {"user_id": f"eq.{USER_ID}", "scan_date": f"eq.{scan_date}", "select": "id", "limit": "1"})
+    return len(rows) > 0
+
+
 # ── rankings (read, for scoring.py) ─────────────────────────
 
 def get_rankings_since(iso_timestamp):
