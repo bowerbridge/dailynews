@@ -153,6 +153,19 @@ def main():
     print("\nChecking for Readwise auto-save candidates...")
     maybe_auto_save(items, sources_by_id)
 
+    # Deduplicate by URL — two sources can surface the same article (especially
+    # when multiple Google News feeds overlap), and a batch upsert with duplicate
+    # user_id+url+scan_date causes a Postgres "cannot affect row a second time" error.
+    seen_urls: set = set()
+    unique_items = []
+    for item in items:
+        if item["link"] not in seen_urls:
+            seen_urls.add(item["link"])
+            unique_items.append(item)
+    if len(unique_items) < len(items):
+        print(f"  ({len(items) - len(unique_items)} duplicate URL(s) dropped)")
+    items = unique_items
+
     print("\nSaving items to database...")
     db_rows = [
         {
