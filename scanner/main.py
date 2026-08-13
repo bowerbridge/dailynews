@@ -73,7 +73,7 @@ Items:
 
     response = client.messages.create(
         model=ANTHROPIC_MODEL,
-        max_tokens=4096,
+        max_tokens=16384,
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -81,7 +81,12 @@ Items:
     raw = text_block.text.strip()
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
-    results = json.loads(raw)
+    try:
+        results = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"  Warning: could not parse Claude response as JSON ({e}). "
+              f"Stop reason: {response.stop_reason}. Returning 0 items.")
+        return []
 
     annotated = []
     for r in results:
