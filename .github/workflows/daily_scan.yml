@@ -2,11 +2,12 @@ name: Daily Brief Scan
 
 on:
   schedule:
-    # Fires at both possible UTC times for 7am Sydney, since GitHub Actions
-    # cron can't follow DST. main.py checks the real Australia/Sydney clock
-    # and no-ops at whichever tick isn't actually 7am local time.
-    - cron: '0 20 * * *'   # 7am AEDT (UTC+11, daylight saving)
-    - cron: '0 21 * * *'   # 7am AEST (UTC+10, standard time)
+    # Two crons, one per UTC offset for Sydney DST. Both target 5am Sydney
+    # so that GitHub Actions' typical 1-2h queue delay delivers the email
+    # by 7am. has_scanned_today() in main.py ensures only the first one
+    # that succeeds actually runs; the second is skipped automatically.
+    - cron: '0 18 * * *'   # 5am AEDT (UTC+11, daylight saving Oct-Apr)
+    - cron: '0 19 * * *'   # 5am AEST (UTC+10, standard time Apr-Oct)
   workflow_dispatch:
     inputs:
       force_run:
@@ -44,3 +45,4 @@ jobs:
           SITE_URL: ${{ vars.SITE_URL }}
           FORCE_RUN: ${{ github.event.inputs.force_run }}
         run: python main.py
+
