@@ -26,15 +26,6 @@ def sydney_now():
     return datetime.now(ZoneInfo("Australia/Sydney"))
 
 
-def should_run_now():
-    """The GitHub Actions cron fires at both possible UTC offsets for 7am
-    Sydney (to survive AEST/AEDT changes) - only actually run at the one
-    that's currently 7am local time. Bypassed by workflow_dispatch.
-    Window is 7-9am to absorb GitHub Actions scheduling delays."""
-    if os.environ.get("FORCE_RUN") == "true":
-        return True
-    return 7 <= sydney_now().hour <= 9
-
 
 def categorize_and_summarize(entries, categories):
     """Ask Claude to pick the best-fit category (or mark irrelevant) and
@@ -119,13 +110,8 @@ def maybe_auto_save(items, sources_by_id):
 def main():
     print(f"\n=== Daily Brief scan: {sydney_now().strftime('%A, %d %B %Y %H:%M %Z')} ===\n")
 
-    if not should_run_now():
-        print("Not 7am Sydney time yet at this cron tick - skipping (this is expected, "
-              "the workflow fires at two UTC times to cover both AEST and AEDT).")
-        sys.exit(0)
-
     scan_date = sydney_now().date().isoformat()
-    if db.has_scanned_today(scan_date):
+    if os.environ.get("FORCE_RUN") != "true" and db.has_scanned_today(scan_date):
         print(f"Already scanned today ({scan_date}) - skipping duplicate cron run.")
         sys.exit(0)
 
