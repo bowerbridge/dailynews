@@ -107,6 +107,48 @@ def build_html(items, categories_by_id, date_str):
 </html>"""
 
 
+def send_low_credits_alert():
+    from_addr = os.environ["EMAIL_FROM"]
+    to_addr = os.environ["EMAIL_TO"]
+
+    html = """
+    <div style="font-family:sans-serif;max-width:600px;margin:40px auto;padding:32px;
+                border:1px solid #e5e7eb;border-radius:8px;background:#fff;">
+      <h2 style="color:#dc2626;margin:0 0 16px;">&#9888; Daily Brief — Anthropic API Credits Low</h2>
+      <p style="color:#374151;line-height:1.6;">
+        Today's Daily Brief could not be sent because the Anthropic API credit balance
+        appears to be too low to process requests.
+      </p>
+      <p style="color:#374151;line-height:1.6;">
+        Please top up your credits to resume daily delivery.
+      </p>
+      <a href="https://console.anthropic.com/settings/billing"
+         style="display:inline-block;margin-top:8px;padding:12px 24px;
+                background:#2563eb;color:#fff;border-radius:6px;
+                text-decoration:none;font-weight:600;">
+        Add Credits &rarr;
+      </a>
+      <p style="color:#6b7280;font-size:13px;margin-top:24px;">
+        Once topped up, you can trigger an immediate run from the
+        <a href="https://github.com/bowerbridge/dailynews/actions/workflows/daily_scan.yml"
+           style="color:#2563eb;">GitHub Actions page</a>
+        using the &ldquo;Run workflow&rdquo; button.
+      </p>
+    </div>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Action required: Daily Brief — Anthropic API credits low"
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg.attach(MIMEText(html, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(from_addr, os.environ["GMAIL_APP_PASSWORD"])
+        server.send_message(msg)
+
+    print(f"  Credit alert email sent to {to_addr}")
+
+
 def send_email(html, date_str):
     from_addr = os.environ["EMAIL_FROM"]
     to_addr = os.environ["EMAIL_TO"]
