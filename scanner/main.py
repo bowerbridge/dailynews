@@ -22,6 +22,10 @@ AUTO_SAVE_THRESHOLD = 0.75
 AUTO_SAVE_MIN_RANKINGS = 5
 
 
+class LowCreditsError(Exception):
+    pass
+
+
 def sydney_now():
     return datetime.now(ZoneInfo("Australia/Sydney"))
 
@@ -62,11 +66,17 @@ Return ONLY a JSON array, no other text:
 Items:
 {entries_text}"""
 
-    response = client.messages.create(
-        model=ANTHROPIC_MODEL,
-        max_tokens=16384,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        response = client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=16384,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except anthropic.APIStatusError as e:
+        err = str(e).lower()
+        if e.status_code == 402 or any(w in err for w in ("credit", "quota", "billing", "balance", "payment")):
+            raise LowCreditsError(str(e)) from e
+        raise
 
     text_block = next(b for b in response.content if b.type == "text")
     raw = text_block.text.strip()
@@ -130,7 +140,12 @@ def main():
     print(f"\nTotal candidate entries: {len(entries)}")
 
     print("\nCategorizing and summarizing with Claude...")
-    items = categorize_and_summarize(entries, categories)
+    try:
+        items = categorize_and_summarize(entries, categories)
+    except LowCreditsError as e:
+        print(f"\nAnthropic API credit error: {e}")
+        email_sender.send_low_credits_alert()
+        sys.exit(1)
     print(f"  {len(items)} relevant items after filtering")
 
     items = scoring.cap_items_per_source(items, sources_by_id)
