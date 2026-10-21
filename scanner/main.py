@@ -120,6 +120,10 @@ def maybe_auto_save(items, sources_by_id):
 def main():
     print(f"\n=== Daily Brief scan: {sydney_now().strftime('%A, %d %B %Y %H:%M %Z')} ===\n")
 
+    if os.environ.get("FORCE_RUN") != "true" and db.is_digest_paused():
+        print("Digest is paused by user - skipping. Resume from the website.")
+        sys.exit(0)
+
     scan_date = sydney_now().date().isoformat()
     if os.environ.get("FORCE_RUN") != "true" and db.has_scanned_today(scan_date):
         print(f"Already scanned today ({scan_date}) - skipping duplicate cron run.")

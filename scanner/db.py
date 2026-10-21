@@ -99,6 +99,14 @@ def has_scanned_today(scan_date):
     return len(rows) > 0
 
 
+# ── user settings ─────────────────────────────────────────────
+
+def is_digest_paused():
+    """Return True if the user has paused the daily digest."""
+    rows = _get("user_settings", {"user_id": f"eq.{USER_ID}", "select": "digest_paused"})
+    return bool(rows and rows[0].get("digest_paused"))
+
+
 # ── rankings (read, for scoring.py) ─────────────────────────
 
 def get_rankings_since(iso_timestamp):

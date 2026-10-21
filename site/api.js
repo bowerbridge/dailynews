@@ -140,6 +140,21 @@ async function getItemsForDate(date) {
   return data;
 }
 
+// ── digest settings ───────────────────────────────────────────
+
+async function getDigestPaused() {
+  const { data, error } = await sb.from("user_settings").select("digest_paused").maybeSingle();
+  if (error) throw error;
+  return data?.digest_paused ?? false;
+}
+
+async function setDigestPaused(paused) {
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from("user_settings")
+    .upsert({ user_id: user.id, digest_paused: paused, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
 // ── suggested sources ────────────────────────────────────────
 
 async function listSuggested() {

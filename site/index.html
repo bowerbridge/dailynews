@@ -21,6 +21,14 @@
 <main>
   <h1 id="pageTitle">Today's Digest</h1>
   <p class="page-subtitle" id="pageSubtitle">Loading...</p>
+  <div class="digest-status-bar" id="digestStatus" hidden>
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText"></span>
+    <button class="pause-btn" id="pauseBtn" onclick="togglePause()"></button>
+  </div>
+  <div class="pause-banner" id="pauseBanner" hidden>
+    Digest is paused — the daily scan will not run until you resume it.
+  </div>
   <div id="content"></div>
 </main>
 
@@ -109,9 +117,47 @@
     });
   }
 
+  async function loadDigestStatus() {
+    try {
+      const paused = await getDigestPaused();
+      const bar = document.getElementById("digestStatus");
+      const dot = document.getElementById("statusDot");
+      const text = document.getElementById("statusText");
+      const btn = document.getElementById("pauseBtn");
+      const banner = document.getElementById("pauseBanner");
+      bar.hidden = false;
+      dot.classList.toggle("paused", paused);
+      text.textContent = paused ? "Digest paused" : "Digest active";
+      btn.textContent = paused ? "Resume" : "Pause";
+      btn.classList.toggle("is-paused", paused);
+      banner.hidden = !paused;
+    } catch (err) {
+      console.error("Failed to load digest status:", err);
+    }
+  }
+
+  async function togglePause() {
+    const btn = document.getElementById("pauseBtn");
+    const paused = btn.classList.contains("is-paused");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      await setDigestPaused(!paused);
+      await loadDigestStatus();
+    } catch (err) {
+      alert("Could not update: " + err.message);
+      await loadDigestStatus();
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   (async () => {
     const user = await requireAuth();
-    if (user) render();
+    if (user) {
+      loadDigestStatus();
+      render();
+    }
   })();
 </script>
 </body>

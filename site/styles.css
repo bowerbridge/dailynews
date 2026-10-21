@@ -199,6 +199,60 @@ form.inline-form button {
 
 .empty-state { color: var(--muted); font-size: 13px; padding: 40px 0; text-align: center; }
 
+.digest-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+.status-dot.paused { background: #f59e0b; }
+.digest-status-bar .pause-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.digest-status-bar .pause-btn.is-paused {
+  border-color: #f59e0b;
+  color: #92400e;
+  background: #fef3c7;
+}
+@media (prefers-color-scheme: dark) {
+  .digest-status-bar .pause-btn.is-paused {
+    color: #fbbf24;
+    background: #451a03;
+    border-color: #92400e;
+  }
+}
+.pause-banner {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  color: #92400e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  .pause-banner {
+    background: #451a03;
+    border-color: #92400e;
+    color: #fbbf24;
+  }
+}
+
 .login-card {
   max-width: 340px;
   margin: 80px auto;

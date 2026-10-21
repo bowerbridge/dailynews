@@ -127,6 +127,18 @@ create trigger rankings_update_source_score
   after insert on rankings
   for each row execute function apply_ranking_to_source();
 
+-- ── user settings ────────────────────────────────────────────
+create table user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  digest_paused boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table user_settings enable row level security;
+
+create policy "owner full access" on user_settings
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 -- ── helpful indexes ───────────────────────────────────────────
 create index items_scan_date_idx on items (user_id, scan_date desc);
 create index rankings_source_idx on rankings (source_id);
